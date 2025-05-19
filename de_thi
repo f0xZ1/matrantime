@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Math Quiz</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    .btn-option {
+      width: 80px;
+      background-color: #1E90FF;
+      color: white;
+      padding: 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 0 8px;
+    }
+    .btn-option:hover {
+      background-color: #1873CC;
+    }
+    .btn-correct {
+      background-color: #32CD32;
+    }
+    .btn-correct:hover {
+      background-color: #28A428;
+    }
+    .btn-incorrect {
+      background-color: #FF6347;
+    }
+    .btn-incorrect:hover {
+      background-color: #D94F3A;
+    }
+    .btn-option:disabled {
+      opacity: 1;
+      cursor: default;
+    }
+    #timer-box {
+      background-color: #32CD32;
+      color: white;
+      font-size: 17px;
+      width: 300px;
+      height: 33px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 10px;
+      font-weight: bold;
+      margin: 0 auto 20px;
+    }
+    .certificate-container {
+      background-color: #ffffff;
+      border: 4px double #4CAF50;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .certificate-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border: 10px solid #f1f8e9;
+      pointer-events: none;
+    }
+    .option-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0 10px;
+    }
+    .mathjax-formula {
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div id="quizContainer" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
+    <h1 class="text-2xl font-bold text-center text-red-700 mb-4">Ma trận nghịch đảo và Định thức</h1>
+    <div id="introScreen" class="space-y-4 text-center">
+      <p>Vui lòng nhập thông tin sinh viên để bắt đầu:</p>
+      <input id="studentName" type="text" placeholder="Họ tên" class="w-full p-2 border rounded">
+      <input id="studentId" type="text" placeholder="MSSV" class="w-full p-2 border rounded">
+      <button id="startQuizButton" class="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600">Bắt đầu bài thi</button>
+    </div>
+    <div id="quizScreen" class="hidden">
+      <div id="timer-box">Thời gian: 00:00</div>
+      <div id="questions" class="space-y-6"></div>
+      <div class="text-center mt-6">
+        <button onclick="finishQuiz()" class="bg-red-500 text-white p-2 rounded hover:bg-red-600">Nộp bài</button>
+      </div>
+    </div>
+    <div id="resultScreen" class="hidden text-center">
+      <h2 id="resultSummary" class="text-xl font-bold"></h2>
+      <div id="resultDetails" class="mt-4"></div>
+      <button onclick="showEmailContent()" class="mt-4 bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Chứng nhận</button>
+    </div>
+  </div>
+  <div id="emailModal" class="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg max-w-2xl w-full">
+      <div id="emailContent"></div>
+      <div class="mt-4 flex justify-center space-x-4">
+        <button onclick="closeEmailModal()" class="bg-gray-500 text-white p-2 rounded hover:bg-gray-600">Đóng</button>
+        <button onclick="downloadPDF()" class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Tải PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State variables
+    let score = 0;
+    let studentName = '';
+    let studentId = '';
+    let seconds = 0;
+    let timerInterval = null;
+    let timerRunning = false;
+    let userAnswers = new Array(10).fill(null);
+
+    const questions = [
+      {
+        text: "\\text{Câu hỏi 1. Tìm ma trận nghịch đảo của ma trận } A = \\begin{bmatrix} 2 & 1 \\\\ 1 & 3 \\end{bmatrix}.",
+        correct_answer: "B",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "\\begin{bmatrix} 3 & -1 \\\\ -1 & 2 \\end{bmatrix}",
+          "\\begin{bmatrix} \\frac{3}{5} & -\\frac{1}{5} \\\\ -\\frac{1}{5} & \\frac{2}{5} \\end{bmatrix}",
+          "\\begin{bmatrix} 2 & -1 \\\\ -1 & 3 \\end{bmatrix}",
+          "\\begin{bmatrix} \\frac{1}{5} & \\frac{1}{5} \\\\ \\frac{1}{5} & -\\frac{2}{5} \\end{bmatrix}"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      },
+      {
+        text: "\\text{Câu hỏi 2. Cho ma trận } A = \\begin{bmatrix} 1 & 2 \\\\ 3 & 4 \\end{bmatrix}. \\text{ Ma trận nghịch đảo } A^{-1} \\text{ là gì?}",
+        correct_answer: "A",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "\\begin{bmatrix} -2 & 1 \\\\ \\frac{3}{2} & -\\frac{1}{2} \\end{bmatrix}",
+          "\\begin{bmatrix} 4 & -2 \\\\ -3 & 1 \\end{bmatrix}",
+          "\\begin{bmatrix} 1 & -2 \\\\ -3 & 4 \\end{bmatrix}",
+          "\\begin{bmatrix} -2 & 3 \\\\ 1 & -1 \\end{bmatrix}"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      },
+      {
+        text: "\\text{Câu hỏi 3. Ma trận nào sau đây không có ma trận nghịch đảo?}",
+        correct_answer: "C",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "\\begin{bmatrix} 1 & 0 \\\\ 0 & 1 \\end{bmatrix}",
+          "\\begin{bmatrix} 2 & 3 \\\\ 4 & 5 \\end{bmatrix}",
+          "\\begin{bmatrix} 1 & 2 \\\\ 2 & 4 \\end{bmatrix}",
+          "\\begin{bmatrix} 3 & 1 \\\\ 1 & 2 \\end{bmatrix}"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      },
+      {
+        text: "\\text{Câu hỏi 4. Cho ma trận } A = \\begin{bmatrix} 4 & 1 \\\\ 2 & 3 \\end{bmatrix}. \\text{ Tìm ma trận nghịch đảo } A^{-1}.",
+        correct_answer: "D",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "\\begin{bmatrix} 3 & -1 \\\\ -2 & 4 \\end{bmatrix}",
+          "\\begin{bmatrix} \\frac{1}{10} & -\\frac{1}{10} \\\\ -\\frac{2}{10} & \\frac{4}{10} \\end{bmatrix}",
+          "\\begin{bmatrix} 4 & -1 \\\\ -2 & 3 \\end{bmatrix}",
+          "\\begin{bmatrix} \\frac{3}{10} & -\\frac{1}{10} \\\\ -\\frac{2}{10} & \\frac{4}{10} \\end{bmatrix}"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      },
+      {
+        text: "\\text{Câu hỏi 5. Nếu ma trận } A \\text{ có định thức bằng 0, điều gì xảy ra với ma trận nghịch đảo của nó?}",
+        correct_answer: "B",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "\\text{Ma trận nghịch đảo luôn tồn tại.}",
+          "\\text{Ma trận nghịch đảo không tồn tại.}",
+          "\\text{Ma trận nghịch đảo tồn tại nhưng không duy nhất.}",
+          "\\text{Ma trận nghịch đảo tồn tại và bằng ma trận đơn vị.}"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      },
+      {
+        text: "\\text{Câu hỏi 6. Tính định thức của ma trận } \\begin{bmatrix} 3 & 2 \\\\ 1 & 4 \\end{bmatrix}.",
+        correct_answer: "A",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "10",
+          "8",
+          "12",
+          "6"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      },
+      {
+        text: "\\text{Câu hỏi 7. Định thức của ma trận } \\begin{bmatrix} 1 & 2 & 3 \\\\ 0 & 4 & 5 \\\\ 0 & 0 & 6 \\end{bmatrix} \\text{ là bao nhiêu?}",
+        correct_answer: "C",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "12",
+          "18",
+          "24",
+          "30"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      },
+      {
+        text: "\\text{Câu hỏi 8. Tính định thức của ma trận } \\begin{bmatrix} 2 & 0 \\\\ 0 & 3 \\end{bmatrix}.",
+        correct_answer: "B",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "5",
+          "6",
+          "4",
+          "8"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      },
+      {
+        text: "\\text{Câu hỏi 9. Cho ma trận } A = \\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}. \\text{ Công thức tính định thức của } A \\text{ là gì?}",
+        correct_answer: "A",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "ad - bc",
+          "ac - bd",
+          "ab - cd",
+          "ad + bc"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      },
+      {
+        text: "\\text{Câu hỏi 10. Định thức của ma trận đơn vị cấp 3 } I_3 = \\begin{bmatrix} 1 & 0 & 0 \\\\ 0 & 1 & 0 \\\\ 0 & 0 & 1 \\end{bmatrix} \\text{ là bao nhiêu?}",
+        correct_answer: "C",
+        options: ['A', 'B', 'C', 'D'],
+        formulas: [
+          "0",
+          "3",
+          "1",
+          "-1"
+        ],
+        explanation_links: ["https://byvn.net/bw30", "https://byvn.net/bw30"]
+      }
+    ];
+
+    const totalQuestions = questions.length;
+
+    // Format time as MM:SS
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Start quiz
+    function startQuiz() {
+      studentName = document.getElementById('studentName').value.trim();
+      studentId = document.getElementById('studentId').value.trim();
+      
+      if (!studentName || !studentId) {
+        alert('Vui lòng nhập đầy đủ Họ tên và Mã số sinh viên!');
+        return;
+      }
+      
+      document.getElementById('introScreen').classList.add('hidden');
+      document.getElementById('quizScreen').classList.remove('hidden');
+      
+      // Reset quiz state
+      score = 0;
+      seconds = 0;
+      userAnswers = new Array(totalQuestions).fill(null);
+      
+      // Start timer
+      timerRunning = true;
+      document.getElementById('timer-box').textContent = formatTime(seconds);
+      timerInterval = setInterval(() => {
+        if (timerRunning) {
+          seconds++;
+          document.getElementById('timer-box').textContent = formatTime(seconds);
+        }
+      }, 1000);
+      
+      displayAllQuestions();
+    }
+
+    // Display all questions
+    function displayAllQuestions() {
+      const questionsDiv = document.getElementById('questions');
+      questionsDiv.innerHTML = '';
+      
+      questions.forEach((question, index) => {
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'mb-8 p-4 bg-gray-50 rounded-lg';
+        
+        questionDiv.innerHTML = `
+          <div class="text-center mb-4 font-bold">\\(${question.text}\\)</div>
+          <div id="feedback-${index}" class="text-center mb-4 hidden"></div>
+        `;
+        
+        const optionsDiv = document.createElement('div');
+        optionsDiv.className = 'flex justify-center gap-4 flex-wrap';
+        
+        question.options.forEach((option, optIndex) => {
+          const optionContainer = document.createElement('div');
+          optionContainer.className = 'option-container';
+          
+          const button = document.createElement('button');
+          button.className = 'btn-option';
+          button.textContent = option;
+          button.onclick = () => selectAnswer(index, option, button);
+          
+          optionContainer.appendChild(button);
+          
+          const formulaDiv = document.createElement('div');
+          formulaDiv.className = 'mathjax-formula';
+          formulaDiv.innerHTML = `\\(${question.formulas[optIndex]}\\)`;
+          optionContainer.appendChild(formulaDiv);
+          
+          optionsDiv.appendChild(optionContainer);
+        });
+        
+        questionDiv.appendChild(optionsDiv);
+        questionsDiv.appendChild(questionDiv);
+      });
+      
+      MathJax.typeset();
+    }
+
+    // Select answer
+    function selectAnswer(questionIndex, selectedOption, button) {
+      const question = questions[questionIndex];
+      userAnswers[questionIndex] = selectedOption;
+      
+      // Disable all buttons for this question
+      const buttons = button.parentElement.parentElement.querySelectorAll('button');
+      buttons.forEach(btn => {
+        btn.disabled = true;
+        if (btn.textContent === question.correct_answer) {
+          btn.classList.add('btn-correct');
+        } else if (btn === button) {
+          btn.classList.add('btn-incorrect');
+        }
+      });
+      
+      // Show feedback
+      const feedbackDiv = document.getElementById(`feedback-${questionIndex}`);
+      feedbackDiv.classList.remove('hidden');
+      
+      if (selectedOption === question.correct_answer) {
+        score++;
+        feedbackDiv.innerHTML = `
+          <div class="text-green-600 font-semibold">
+            Chính xác! Đáp án ${selectedOption} là đúng.
+            <a href="${question.explanation_links[1]}" target="_blank" class="text-blue-500 underline">Xem giải thích</a>
+          </div>
+        `;
+      } else {
+        feedbackDiv.innerHTML = `
+          <div class="text-red-600 font-semibold">
+            Sai rồi! Bạn chọn ${selectedOption}, đáp án đúng là ${question.correct_answer}.
+            <a href="${question.explanation_links[0]}" target="_blank" class="text-blue-500 underline">Xem giải thích</a>
+          </div>
+        `;
+      }
+    }
+
+    // Finish quiz
+    function finishQuiz() {
+      if (timerRunning) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+      }
+      
+      // Calculate results
+      const percentage = Math.round((score / totalQuestions) * 100);
+      const grade = ((score / totalQuestions) * 10).toFixed(1);
+      
+      // Show results
+      document.getElementById('quizScreen').classList.add('hidden');
+      document.getElementById('resultScreen').classList.remove('hidden');
+      
+      document.getElementById('resultSummary').innerHTML = `
+        <span class="text-2xl">Kết quả bài thi</span><br>
+        <span class="text-4xl font-bold ${percentage >= 50 ? 'text-green-600' : 'text-red-600'}">${score}/${totalQuestions}</span>
+      `;
+      
+      document.getElementById('resultDetails').innerHTML = `
+        <div class="mb-4">
+          <p class="text-lg">Tỷ lệ đúng: <span class="font-bold">${percentage}%</span></p>
+          <p class="text-lg">Điểm số: <span class="font-bold">${grade}/10</span></p>
+          <p class="text-lg">Thời gian hoàn thành: <span class="font-bold">${formatTime(seconds)}</span></p>
+        </div>
+      `;
+    }
+
+    // Show certificate
+    function showEmailContent() {
+      const percentage = Math.round((score / totalQuestions) * 100);
+      const grade = ((score / totalQuestions) * 10).toFixed(1);
+      
+      document.getElementById('emailContent').innerHTML = `
+        <div class="certificate-container" id="certificate">
+          <div style="text-align: center; font-size: 30px; color: #9e1818; font-weight: bold; margin-bottom: 20px;">
+            CHỨNG NHẬN HOÀN THÀNH
+          </div>
+          <div style="text-align: center; font-size: 24px; color: #333; margin-bottom: 20px;">
+            Ma trận nghịch đảo và Định thức
+          </div>
+          <div style="margin: 20px 0; font-size: 16px; color: #555;">
+            <div style="padding: 15px; border: 1px solid #4CAF50; border-radius: 8px; background-color: #e8f5e9; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); margin-bottom: 15px;">
+              <p><strong>Họ và Tên:</strong> <span style="font-size: 18px; font-weight: bold; color: #4CAF50; background-color: #f1f8e9; padding: 2px 6px; border-radius: 4px;">${studentName}</span></p>
+              <p><strong>Mã Số Sinh Viên:</strong> <span style="font-size: 18px; font-weight: bold; color: #4CAF50; background-color: #f1f8e9; padding: 2px 6px; border-radius: 4px;">${studentId}</span></p>
+            </div>
+            <div style="padding: 15px; border: 1px solid #4CAF50; border-radius: 8px; background-color: #e8f5e9; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); margin-bottom: 15px;">
+              <p>Điểm số: <span style="font-size: 20px; font-weight: bold; color: #ff6347;">${grade}/10</span></p>
+              <p>Tỷ lệ hoàn thành: <span style="font-size: 20px; font-weight: bold; color: #32cd32;">${percentage}%</span></p>
+            </div>
+            <div style="padding: 15px; border: 1px solid #4CAF50; border-radius: 8px; background-color: #e8f5e9; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+              <p>Thời gian hoàn thành: <span style="font-size: 18px; font-weight: bold; color: #555;">${formatTime(seconds)}</span></p>
+            </div>
+          </div>
+          <div style="margin-top: 30px; font-size: 14px; text-align: center; color: #777;">
+            Được cấp bởi,<br>Quiz Organizer<br>
+            Ngày cấp: ${new Date().toLocaleDateString('vi-VN')}
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('emailModal').classList.remove('hidden');
+      MathJax.typeset();
+    }
+
+    // Download PDF
+    function downloadPDF() {
+      const element = document.getElementById('certificate');
+      const opt = {
+        margin: 0.5,
+        filename: `ChungNhan_${studentId}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+      
+      html2pdf().set(opt).from(element).save();
+    }
+
+    // Close modal
+    function closeEmailModal() {
+      document.getElementById('emailModal').classList.add('hidden');
+    }
+
+    // Initialize event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('startQuizButton').addEventListener('click', startQuiz);
+    });
+  </script>
+</body>
+</html>
